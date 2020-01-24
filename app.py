@@ -1,6 +1,6 @@
 from flask import Flask, render_template, flash, redirect, url_for, session, logging, request
 from flask.logging import create_logger
-from data import Articles
+#from data import Articles
 from flask_mysqldb import MySQL
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
@@ -21,8 +21,7 @@ app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 mysql = MySQL(app)
 
 
-Articles = Articles()
-
+#Articles = Articles()
 
 @app.route('/')
 def index():
@@ -36,14 +35,38 @@ def about():
 
 @app.route('/articles')
 def articles():
-    return render_template('articles.html', articles=Articles)
+    # Cria o cursor
+    cur = mysql.connection.cursor()
+
+    # Obtem os artigos
+    result = cur.execute('SELECT * FROM articles')
+
+    articles = cur.fetchall()
+
+    if result > 0:
+        return render_template('articles.html', articles=articles)
+    else:
+        msg = 'Nenhum artigo foi encontrado!'
+        return render_template('articles.html', msg=msg)
+
+    # Fecha a conexão
+    cur.close()
 
 
 @app.route('/article/<string:id>')
 def article(id):
-    return render_template('article.html', id=id)
+    # Cria o cursor
+    cur = mysql.connection.cursor()
+
+    # Obtem os artigos
+    result = cur.execute('SELECT * FROM articles WHERE id = %s', [id])
+
+    article = cur.fetchone()
+
+    return render_template('article.html', article=article)
 
 
+# Classe Form Registrar
 class RegisterForm(Form):
     name = StringField('Nome', [validators.Length(min=1, max=50)])
     username = StringField('Usuário', [validators.Length(min=4, max=25)])
@@ -137,17 +160,67 @@ def is_logged_in(f):
 
 # Logout
 @app.route('/logout')
+@is_logged_in
 def logout():
     session.clear()
     flash('Você fez logout', 'success')
     return redirect(url_for('login'))
 
-
 # Dashboard
 @app.route('/dashboard')
 @is_logged_in
 def dashboard():
-    return render_template('dashboard.html')
+    # Cria o cursor
+    cur = mysql.connection.cursor()
+
+    # Obtem os artigos
+    result = cur.execute('SELECT * FROM articles')
+
+    articles = cur.fetchall()
+
+    if result > 0:
+        return render_template('dashboard.html', articles=articles)
+    else:
+        msg = 'Nenhum artigo foi encontrado!'
+        return render_template('dashboard.html', msg=msg)
+
+    # Fecha a conexão
+    cur.close()
+
+
+# Classe Form Artigo
+class ArticleForm(Form):
+    title = StringField('Título', [validators.Length(min=1, max=200)])
+    body = TextAreaField('Texto', [validators.Length(min=30)])
+
+
+# Adiciona Artigo
+@app.route('/add_article', methods=['GET', 'POST'])
+@is_logged_in
+def add_article():
+    form = ArticleForm(request.form)
+    if request.method == 'POST' and form.validate():
+        title = form.title.data
+        body = form.body.data
+
+        # Cria cursor
+        cur = mysql.connection.cursor()
+
+        # Executa
+        cur.execute('INSERT INTO articles(title, body, author) VALUES(%s,%s,%s)',
+                    (title, body, session['username']))
+
+        # Commit
+        mysql.connection.commit()
+
+        # Encerra a conexão
+        cur.close()
+
+        flash('Artigo criado!', 'success')
+
+        return redirect(url_for('dashboard'))
+
+    return render_template('add_article.html', form=form)
 
 
 if __name__ == '__main__':
