@@ -5,10 +5,12 @@ from flask_mysqldb import MySQL
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from functools import wraps
+from flask_scss import Scss
 
 app = Flask(__name__)
 app.secret_key = 'secret key'
 log = create_logger(app)
+Scss(app, static_dir='static', asset_dir='assets')
 
 # Config MySQl
 app.config['MYSQL_HOST'] = 'localhost'
@@ -144,8 +146,6 @@ def login():
     return render_template('login.html')
 
 # Checa se usuário está logado
-
-
 def is_logged_in(f):
     @wraps(f)
     def wrap(*args, **kwargs):
@@ -221,6 +221,68 @@ def add_article():
         return redirect(url_for('dashboard'))
 
     return render_template('add_article.html', form=form)
+
+
+# Edita Artigo
+@app.route('/edit_article/<string:id>', methods=['GET', 'POST'])
+@is_logged_in
+def edit_article(id):
+    # Cria cursor
+    cur = mysql.connection.cursor()
+
+    #Obtem o artigo por id
+    result = cur.execute("SELECT * FROM articles WHERE id = %s", [id])
+
+    article = cur.fetchone()
+
+    #Obtem o form
+    form = ArticleForm(request.form)
+
+    #Popula os artigos pelos campos
+    form.title.data = article['title']
+    form.body.data = article['body']
+
+    if request.method == 'POST' and form.validate():
+        title = request.form['title']
+        body = request.form['body']
+
+        # Cria cursor
+        cur = mysql.connection.cursor()
+
+        # Executa
+        cur.execute('UPDATE articles SET title=%s, body=%s WHERE id=%s', (title,body,id))
+
+        # Commit
+        mysql.connection.commit()
+
+        # Encerra a conexão
+        cur.close()
+
+        flash('Artigo editado!', 'success')
+
+        return redirect(url_for('dashboard'))
+
+    return render_template('edit_article.html', form=form)
+
+#Delete artigo
+@app.route('/delete_article/<string:id>', methods=['POST'])
+@is_logged_in
+def delete_article(id):
+    #Cria cursor
+    cur = mysql.connection.cursor()
+
+    #Execute
+    cur.execute('DELETE FROM articles WHERE id=%s', [id])
+
+    #Commit
+    mysql.connection.commit()
+
+    #Fecha cursor
+    cur.close()
+
+    flash('Artigo excluído!', 'success')
+
+    return redirect(url_for('dashboard'))
 
 
 if __name__ == '__main__':
