@@ -1,16 +1,14 @@
 from flask import Flask, render_template, flash, redirect, url_for, session, logging, request
 from flask.logging import create_logger
-#from data import Articles
 from flask_mysqldb import MySQL
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from functools import wraps
-from flask_scss import Scss
+
 
 app = Flask(__name__)
 app.secret_key = 'secret key'
 log = create_logger(app)
-Scss(app, static_dir='static', asset_dir='assets')
 
 # Config MySQl
 app.config['MYSQL_HOST'] = 'localhost'
